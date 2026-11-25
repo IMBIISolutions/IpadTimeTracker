@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Tracker</title>
+<style>
+/* ---------- shared layout ---------- */
+* { -webkit-box-sizing: border-box; box-sizing: border-box; }
+body { margin: 0; padding: 14px; min-height: 100vh; font-size: 16px; }
+h1 { font-size: 22px; margin: 4px 0 4px; }
+h2 { font-size: 16px; margin: 0 0 8px; }
+.sub { font-size: 13px; margin-bottom: 12px; }
+.card { padding: 14px; margin-bottom: 16px; position: relative; }
+label { display: block; font-size: 13px; margin-bottom: 2px; }
+select, textarea { width: 100%; font-size: 17px; padding: 10px; margin: 6px 0 10px 0; -webkit-appearance: none; border-radius: 0; }
+button { font-size: 16px; padding: 11px 14px; margin: 4px 6px 4px 0; border: none; -webkit-appearance: none; border-radius: 0; }
+button:disabled { opacity: 0.4; }
+.status { margin: 6px 0 8px; }
+.msg { font-size: 14px; min-height: 18px; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { padding: 5px 4px; text-align: left; vertical-align: top; }
+.hidden { display: none; }
+.topbar { overflow: hidden; }
+.topbar .themebtn { float: right; font-size: 13px; padding: 8px 10px; margin: 0; }
+
+/* ---------- CYBERPUNK ---------- */
+body.t-cyber {
+  font-family: "Courier New", Courier, monospace;
+  color: #d8f6ff;
+  background-color: #07020f;
+  background-image:
+    -webkit-linear-gradient(rgba(0,240,255,0.07) 1px, transparent 1px),
+    -webkit-linear-gradient(left, rgba(255,43,214,0.07) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(0,240,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,43,214,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.t-cyber h1 {
+  font-size: 24px; letter-spacing: 4px; text-transform: uppercase; color: #fcee0a;
+  text-shadow: 2px 0 #ff2bd6, -2px 0 #00f0ff, 0 0 14px rgba(252,238,10,0.6);
+}
+.t-cyber h2 { color: #00f0ff; text-transform: uppercase; letter-spacing: 3px; text-shadow: 0 0 8px #00f0ff; }
+.t-cyber .sub { color: #ff2bd6; letter-spacing: 2px; text-transform: uppercase; }
+.t-cyber .msg { color: #fcee0a; }
+.t-cyber .msg:before { content: "> "; color: #00f0ff; }
+.t-cyber .card {
+  background: rgba(14, 6, 32, 0.88);
+  border: 1px solid #00f0ff;
+  -webkit-box-shadow: 0 0 12px rgba(0,240,255,0.45), inset 0 0 18px rgba(0,240,255,0.1);
+  box-shadow: 0 0 12px rgba(0,240,255,0.45), inset 0 0 18px rgba(0,240,255,0.1);
+  -webkit-clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+.t-cyber .card:before {
+  content: ""; position: absolute; left: 0; top: 0; width: 5px; height: 100%;
+  background: #ff2bd6; -webkit-box-shadow: 0 0 10px #ff2bd6; box-shadow: 0 0 10px #ff2bd6;
+}
+.t-cyber label { color: #ff2bd6; text-transform: uppercase; letter-spacing: 2px; }
+.t-cyber select, .t-cyber textarea {
+  background: #0b0420; color: #00f0ff; border: 1px solid #ff2bd6;
+  font-family: "Courier New", Courier, monospace;
+}
+.t-cyber button {
+  font-family: "Courier New", Courier, monospace; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;
+  background: #00f0ff; color: #07020f;
+  -webkit-box-shadow: 0 0 12px rgba(0,240,255,0.8); box-shadow: 0 0 12px rgba(0,240,255,0.8);
+}
+.t-cyber button.stop { background: #ff2bd6; color: #fff; -webkit-box-shadow: 0 0 12px rgba(255,43,214,0.8); box-shadow: 0 0 12px rgba(255,43,214,0.8); }
+.t-cyber button.secondary { background: transparent; color: #fcee0a; border: 1px solid #fcee0a; -webkit-box-shadow: none; box-shadow: none; }
+.t-cyber .status { color: #00f0ff; }
+.t-cyber th { color: #fcee0a; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ff2bd6; }
+.t-cyber td { border-bottom: 1px solid rgba(0,240,255,0.25); }
+/* scanlines */
+.t-cyber:after {
+  content: ""; position: fixed; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none;
+  background: -webkit-repeating-linear-gradient(top, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.22) 3px);
+  background: repeating-linear-gradient(rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.22) 3px);
+}
+
+/* ---------- FARM / PIXEL ---------- */
+body.t-farm {
+  font-family: "Chalkboard SE", "Marker Felt", "Courier New", monospace;
+  font-weight: bold;
+  color: #4a2c12;
+  background-color: #7fbf4d;
+  background-image:
+    -webkit-linear-gradient(45deg, #72b343 25%, transparent 25%, transparent 75%, #72b343 75%),
+    -webkit-linear-gradient(45deg, #72b343 25%, transparent 25%, transparent 75%, #72b343 75%);
+  background-image:
+    linear-gradient(45deg, #72b343 25%, transparent 25%, transparent 75%, #72b343 75%),
+    linear-gradient(45deg, #72b343 25%, transparent 25%, transparent 75%, #72b343 75%);
+  background-size: 32px 32px;
+  background-position: 0 0, 16px 16px;
+}
+.t-farm h1 {
+  font-size: 24px; color: #fff6d6; letter-spacing: 1px;
+  text-shadow: 3px 3px 0 #4a2c12, -1px -1px 0 #4a2c12, 1px -1px 0 #4a2c12, -1px 1px 0 #4a2c12;
+}
+.t-farm h2 { color: #4a2c12; }
+.t-farm .sub { color: #fff6d6; text-shadow: 2px 2px 0 #4a2c12; }
+.t-farm .msg { color: #4a2c12; background: #fff0b8; padding: 4px 8px; min-height: 26px; border: 3px solid #4a2c12; }
+.t-farm .card {
+  background: #f3d9a0;
+  border: none;
+  margin-left: 4px; margin-right: 4px;
+  /* stepped "pixel" corners via box-shadow */
+  -webkit-box-shadow: 0 -4px 0 0 #4a2c12, 0 4px 0 0 #4a2c12, -4px 0 0 0 #4a2c12, 4px 0 0 0 #4a2c12, 0 10px 0 0 rgba(74,44,18,0.35);
+  box-shadow: 0 -4px 0 0 #4a2c12, 0 4px 0 0 #4a2c12, -4px 0 0 0 #4a2c12, 4px 0 0 0 #4a2c12, 0 10px 0 0 rgba(74,44,18,0.35);
+}
+.t-farm label { color: #8a4b1c; }
+.t-farm select, .t-farm textarea {
+  background: #fff8e0; color: #4a2c12; border: 3px solid #8a4b1c;
+  font-family: "Chalkboard SE", "Marker Felt", "Courier New", monospace; font-weight: bold;
+}
+.t-farm button {
+  font-family: "Chalkboard SE", "Marker Felt", "Courier New", monospace; font-weight: bold;
+  background: #5aa02c; color: #fff; border: 3px solid #4a2c12;
+  -webkit-box-shadow: 0 5px 0 #2f6a14; box-shadow: 0 5px 0 #2f6a14;
+  margin-bottom: 9px;
+}
+.t-farm button:active { -webkit-transform: translateY(4px); transform: translateY(4px); -webkit-box-shadow: 0 1px 0 #2f6a14; box-shadow: 0 1px 0 #2f6a14; }
+.t-farm button.stop { background: #d9622b; -webkit-box-shadow: 0 5px 0 #8f3a12; box-shadow: 0 5px 0 #8f3a12; }
+.t-farm button.secondary { background: #e0a93c; color: #4a2c12; -webkit-box-shadow: 0 5px 0 #a8741a; box-shadow: 0 5px 0 #a8741a; }
+.t-farm .status { color: #4a2c12; }
+.t-farm th { border-bottom: 3px solid #8a4b1c; color: #8a4b1c; }
+.t-farm td { border-bottom: 2px dashed #c9a35e; }
+</style>
+</head>
+<body class="t-cyber">
+
+<div class="topbar">
+  <button class="secondary themebtn" id="themeBtn" onclick="toggleTheme()">Theme</button>
+  <h1 id="title">Time Tracker</h1>
+  <div class="sub" id="subtitle"></div>
+</div>
+<div class="msg" id="msg"></div>
+
+<div class="card">
+  <label id="lblProject">Project</label>
+  <select id="project"></select>
+  <button class="secondary" onclick="loadProjects()">Refresh projects</button>
+  <div class="status" id="runningStatus"></div>
+  <button id="startBtn" onclick="startTimer()">Start</button>
+  <button id="endBtn" class="stop" onclick="showEnd()">End</button>
+</div>
+
+<div class="card hidden" id="endCard">
+  <label>What did you work on?</label>
+  <textarea id="description" rows="3"></textarea>
+  <button onclick="saveEntry()">Save entry</button>
+  <button class="secondary" onclick="cancelEnd()">Cancel</button>
+</div>
+
+<div class="card">
+  <div class="status" id="pendingStatus"></div>
+  <button onclick="syncEntries()">Sync to SharePoint</button>
+  <button class="secondary" onclick="toggleCsv()">Show CSV backup</button>
+  <textarea id="csvBox" class="hidden" rows="8"></textarea>
+</div>
+
+<div class="card">
+  <h2 id="logTitle">Entries on this iPad</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Project</th><th>Hours</th><th>Description</th><th>Sent</th></tr></thead>
+    <tbody id="entryRows"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2 id="connTitle">Connection</h2>
+  <div class="status" id="flowStatus"></div>
+  <label>Power Automate flow URL (kept on this iPad only)</label>
+  <textarea id="flowUrl" rows="3" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+  <button onclick="saveFlowUrl()">Save URL</button>
+  <button class="secondary" onclick="clearFlowUrl()">Remove URL</button>
+</div>
+
+<script>
+// ---- Settings ----
+// The flow URL is NOT stored in this file. You enter it once in the
+// "Connection" box at the bottom of the page and it is kept on the iPad only.
+var ROUND_TO_HOURS = 0.25; // logged time is rounded to the nearest quarter hour
+
+// ---- Storage keys (saved in the browser on this iPad) ----
+var KEY_FLOW = 'tt_flow_url';
+var KEY_PROJECTS = 'tt_projects';
+var KEY_ENTRIES = 'tt_entries';
+var KEY_RUNNING = 'tt_running';
+var KEY_THEME = 'tt_theme';
+
+// ---- Themes ----
+var THEMES = {
+  cyber: {
+    cls: 't-cyber',
+    button: 'Theme: Farm',
+    title: 'NET//TIMER',
+    subtitle: 'jack in. log hours. get paid.',
+    project: 'Target contract',
+    log: 'Local datastore'
+  },
+  farm: {
+    cls: 't-farm',
+    button: 'Theme: Neon',
+    title: '🌾 Time Farm',
+    subtitle: 'plant your hours, harvest your log',
+    project: 'Which crop? (project)',
+    log: '📦 Shipping bin (entries)'
+  }
+};
+
+function currentTheme() {
+  var t = load(KEY_THEME, 'cyber');
+  return THEMES[t] ? t : 'cyber';
+}
+
+function applyTheme() {
+  var t = THEMES[currentTheme()];
+  document.body.className = t.cls;
+  document.getElementById('themeBtn').textContent = t.button;
+  document.getElementById('title').textContent = t.title;
+  document.getElementById('subtitle').textContent = t.subtitle;
+  document.getElementById('lblProject').textContent = t.project;
+  document.getElementById('logTitle').textContent = t.log;
+}
+
+function toggleTheme() {
+  save(KEY_THEME, currentTheme() === 'cyber' ? 'farm' : 'cyber');
+  applyTheme();
+}
+
+function load(key, fallback) {
+  try {
+    var raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function save(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    setMsg('Could not save on this iPad. Storage may be full or blocked.');
+    return false;
+  }
+}
+
+function setMsg(text) {
+  document.getElementById('msg').textContent = text;
+}
+
+// Simple XMLHttpRequest wrapper (fetch is not available in Safari 9)
+function request(method, url, body, onDone) {
+  var xhr = new XMLHttpRequest();
+  xhr.open(method, url, true);
+  if (body) {
+    xhr.setRequestHeader('Content-Type', 'application/json');
+  }
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      onDone(null, xhr.responseText);
+    } else {
+      onDone('HTTP ' + xhr.status, null);
+    }
+  };
+  xhr.onerror = function () {
+    onDone('no connection', null);
+  };
+  xhr.send(body ? JSON.stringify(body) : null);
+}
+
+function getFlowUrl() {
+  try {
+    return localStorage.getItem(KEY_FLOW) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function flowReady() {
+  if (!getFlowUrl()) {
+    setMsg('Enter your flow URL in the Connection box at the bottom first.');
+    return false;
+  }
+  return true;
+}
+
+function saveFlowUrl() {
+  var box = document.getElementById('flowUrl');
+  var url = box.value.replace(/\s+/g, '');
+  if (url.indexOf('https://') !== 0) {
+    setMsg('The flow URL should start with https://');
+    return;
+  }
+  try {
+    localStorage.setItem(KEY_FLOW, url);
+  } catch (e) {
+    setMsg('Could not save on this iPad. Storage may be full or blocked.');
+    return;
+  }
+  box.value = '';
+  refreshFlowStatus();
+  setMsg('Flow URL saved on this iPad.');
+}
+
+function clearFlowUrl() {
+  try {
+    localStorage.removeItem(KEY_FLOW);
+  } catch (e) {}
+  refreshFlowStatus();
+  setMsg('Flow URL removed from this iPad.');
+}
+
+function refreshFlowStatus() {
+  document.getElementById('flowStatus').textContent = getFlowUrl()
+    ? 'Flow URL is saved on this iPad.'
+    : 'No flow URL saved yet.';
+}
+
+// ---- Projects ----
+function renderProjects() {
+  var sel = document.getElementById('project');
+  var projects = load(KEY_PROJECTS, []);
+  sel.innerHTML = '';
+  if (!projects.length) {
+    var empty = document.createElement('option');
+    empty.value = '';
+    empty.text = '(tap Refresh projects)';
+    sel.appendChild(empty);
+  }
+  for (var i = 0; i < projects.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = projects[i];
+    opt.text = projects[i];
+    sel.appendChild(opt);
+  }
+}
+
+function loadProjects() {
+  if (!flowReady()) return;
+  setMsg('Loading projects...');
+  request('POST', getFlowUrl(), { action: 'projects' }, function (err, text) {
+    if (err) {
+      setMsg('Could not load projects (' + err + '). Check the hotspot.');
+      return;
+    }
+    try {
+      var data = JSON.parse(text);
+      save(KEY_PROJECTS, data.projects || []);
+      renderProjects();
+      setMsg('Projects updated.');
+    } catch (e) {
+      setMsg('Unexpected response from the flow.');
+    }
+  });
+}
+
+// ---- Timer ----
+function refreshTimerUI() {
+  var running = load(KEY_RUNNING, null);
+  var st = document.getElementById('runningStatus');
+  if (running) {
+    st.textContent = 'Tracking ' + running.project + ' since ' + new Date(running.start).toLocaleTimeString();
+  } else {
+    st.textContent = 'Not tracking.';
+  }
+  document.getElementById('startBtn').disabled = !!running;
+  document.getElementById('endBtn').disabled = !running;
+  document.getElementById('project').disabled = !!running;
+}
+
+function startTimer() {
+  var sel = document.getElementById('project');
+  if (!sel.value) {
+    setMsg('Pick a project first (tap Refresh projects if the list is empty).');
+    return;
+  }
+  if (save(KEY_RUNNING, { project: sel.value, start: new Date().toISOString() })) {
+    setMsg('Timer started.');
+    refreshTimerUI();
+  }
+}
+
+function showEnd() {
+  document.getElementById('description').value = '';
+  document.getElementById('endCard').className = 'card';
+  document.getElementById('description').focus();
+}
+
+function cancelEnd() {
+  document.getElementById('endCard').className = 'card hidden';
+}
+
+function saveEntry() {
+  var running = load(KEY_RUNNING, null);
+  if (!running) {
+    setMsg('Nothing is running.');
+    return;
+  }
+  var desc = document.getElementById('description').value.trim();
+  if (!desc) {
+    setMsg('Add a short description first.');
+    return;
+  }
+  var endDate = new Date();
+  var startDate = new Date(running.start);
+  var rawHours = (endDate - startDate) / 3600000;
+  var hours = Math.max(ROUND_TO_HOURS, Math.round(rawHours / ROUND_TO_HOURS) * ROUND_TO_HOURS);
+
+  var entries = load(KEY_ENTRIES, []);
+  entries.push({
+    id: Date.now() + '-' + Math.floor(Math.random() * 100000),
+    project: running.project,
+    start: running.start,
+    end: endDate.toISOString(),
+    hours: hours,
+    description: desc,
+    sent: false
+  });
+
+  if (save(KEY_ENTRIES, entries)) {
+    localStorage.removeItem(KEY_RUNNING);
+    cancelEnd();
+    refreshTimerUI();
+    renderEntries();
+    setMsg('Entry saved on this iPad (' + hours.toFixed(2) + ' h).');
+  }
+}
+
+// ---- Entries and sync ----
+function addCell(tr, text) {
+  var td = document.createElement('td');
+  td.textContent = text;
+  tr.appendChild(td);
+}
+
+function renderEntries() {
+  var entries = load(KEY_ENTRIES, []);
+  var tbody = document.getElementById('entryRows');
+  tbody.innerHTML = '';
+  var pending = 0;
+  for (var i = entries.length - 1; i >= 0; i--) {
+    var e = entries[i];
+    if (!e.sent) pending++;
+    var tr = document.createElement('tr');
+    addCell(tr, new Date(e.start).toLocaleDateString());
+    addCell(tr, e.project);
+    addCell(tr, Number(e.hours).toFixed(2));
+    addCell(tr, e.description);
+    addCell(tr, e.sent ? 'yes' : 'no');
+    tbody.appendChild(tr);
+  }
+  document.getElementById('pendingStatus').textContent = pending + ' entries waiting to sync.';
+}
+
+function syncEntries() {
+  if (!flowReady()) return;
+  var entries = load(KEY_ENTRIES, []);
+  var unsent = [];
+  for (var i = 0; i < entries.length; i++) {
+    if (!entries[i].sent) unsent.push(entries[i]);
+  }
+  if (!unsent.length) {
+    setMsg('Nothing to sync.');
+    return;
+  }
+  setMsg('Sending ' + unsent.length + ' entries...');
+  request('POST', getFlowUrl(), { action: 'entries', entries: unsent }, function (err) {
+    if (err) {
+      setMsg('Sync failed (' + err + '). Entries are kept on this iPad, so try again later.');
+      return;
+    }
+    var sentIds = {};
+    for (var j = 0; j < unsent.length; j++) sentIds[unsent[j].id] = true;
+    var all = load(KEY_ENTRIES, []);
+    for (var k = 0; k < all.length; k++) {
+      if (sentIds[all[k].id]) all[k].sent = true;
+    }
+    save(KEY_ENTRIES, all);
+    renderEntries();
+    setMsg('Synced ' + unsent.length + ' entries.');
+  });
+}
+
+// ---- CSV backup (copy this text and save it on the laptop) ----
+function csvCell(v) {
+  return '"' + String(v).replace(/"/g, '""') + '"';
+}
+
+function buildCsv() {
+  var entries = load(KEY_ENTRIES, []);
+  var lines = ['start,end,project,hours,description,sent'];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    lines.push([e.start, e.end, e.project, e.hours, e.description, e.sent ? 'yes' : 'no'].map(csvCell).join(','));
+  }
+  return lines.join('\n');
+}
+
+function toggleCsv() {
+  var box = document.getElementById('csvBox');
+  if (box.className === 'hidden') {
+    box.value = buildCsv();
+    box.className = '';
+  } else {
+    box.className = 'hidden';
+  }
+}
+
+// ---- Start up ----
+applyTheme();
+refreshFlowStatus();
+renderProjects();
+refreshTimerUI();
+renderEntries();
+</script>
+</body>
+</html>
