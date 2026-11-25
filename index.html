@@ -335,8 +335,8 @@ function renderProjects() {
   }
   for (var i = 0; i < projects.length; i++) {
     var opt = document.createElement('option');
-    opt.value = projects[i];
-    opt.text = projects[i];
+    opt.value = projects[i].id;    // SharePoint item ID (needed for the lookup column)
+    opt.text = projects[i].name;   // what you see in the list
     sel.appendChild(opt);
   }
 }
@@ -351,7 +351,12 @@ function loadProjects() {
     }
     try {
       var data = JSON.parse(text);
-      save(KEY_PROJECTS, data.projects || []);
+      var list = data.projects || [];
+      if (list.length && (typeof list[0] !== 'object' || list[0].id === undefined)) {
+        setMsg('Projects need an id and a name. Check the Select step in the flow.');
+        return;
+      }
+      save(KEY_PROJECTS, list);
       renderProjects();
       setMsg('Projects updated.');
     } catch (e) {
@@ -380,7 +385,8 @@ function startTimer() {
     setMsg('Pick a project first (tap Refresh projects if the list is empty).');
     return;
   }
-  if (save(KEY_RUNNING, { project: sel.value, start: new Date().toISOString() })) {
+  var chosen = sel.options[sel.selectedIndex];
+  if (save(KEY_RUNNING, { project: chosen.text, projectId: sel.value, start: new Date().toISOString() })) {
     setMsg('Timer started.');
     refreshTimerUI();
   }
@@ -416,6 +422,7 @@ function saveEntry() {
   entries.push({
     id: Date.now() + '-' + Math.floor(Math.random() * 100000),
     project: running.project,
+    projectId: running.projectId,
     start: running.start,
     end: endDate.toISOString(),
     hours: hours,
