@@ -175,6 +175,8 @@ body.t-farm {
   <textarea id="flowUrl" rows="3" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
   <button onclick="saveFlowUrl()">Save URL</button>
   <button class="secondary" onclick="clearFlowUrl()">Remove URL</button>
+  <button class="secondary" onclick="toggleFlowView()">Show saved URL</button>
+  <textarea id="flowView" class="hidden" rows="6" readonly></textarea>
 </div>
 
 <script>
@@ -314,6 +316,17 @@ function clearFlowUrl() {
   } catch (e) {}
   refreshFlowStatus();
   setMsg('Flow URL removed from this iPad.');
+}
+
+function toggleFlowView() {
+  var box = document.getElementById('flowView');
+  if (box.className === 'hidden') {
+    box.value = getFlowUrl() || '(nothing saved)';
+    box.className = '';
+  } else {
+    box.value = '';
+    box.className = 'hidden';
+  }
 }
 
 function refreshFlowStatus() {
