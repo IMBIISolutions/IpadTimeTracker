@@ -13,7 +13,8 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .sub { font-size: 13px; margin-bottom: 12px; }
 .card { padding: 14px; margin-bottom: 16px; position: relative; }
 label { display: block; font-size: 13px; margin-bottom: 2px; }
-select, textarea { width: 100%; font-size: 17px; padding: 10px; margin: 6px 0 10px 0; -webkit-appearance: none; border-radius: 0; }
+select, textarea, input[type=datetime-local] { width: 100%; font-size: 17px; padding: 10px; margin: 6px 0 10px 0; -webkit-appearance: none; border-radius: 0; min-height: 44px; }
+.topbar .themebtn + .themebtn { margin-right: 6px; }
 button { font-size: 16px; padding: 11px 14px; margin: 4px 6px 4px 0; border: none; -webkit-appearance: none; border-radius: 0; }
 button:disabled { opacity: 0.4; }
 .status { margin: 6px 0 8px; }
@@ -58,7 +59,7 @@ body.t-cyber {
   background: #ff2bd6; -webkit-box-shadow: 0 0 10px #ff2bd6; box-shadow: 0 0 10px #ff2bd6;
 }
 .t-cyber label { color: #ff2bd6; text-transform: uppercase; letter-spacing: 2px; }
-.t-cyber select, .t-cyber textarea {
+.t-cyber select, .t-cyber textarea, .t-cyber input[type=datetime-local] {
   background: #0b0420; color: #00f0ff; border: 1px solid #ff2bd6;
   font-family: "Courier New", Courier, monospace;
 }
@@ -110,7 +111,7 @@ body.t-farm {
   box-shadow: 0 -4px 0 0 #4a2c12, 0 4px 0 0 #4a2c12, -4px 0 0 0 #4a2c12, 4px 0 0 0 #4a2c12, 0 10px 0 0 rgba(74,44,18,0.35);
 }
 .t-farm label { color: #8a4b1c; }
-.t-farm select, .t-farm textarea {
+.t-farm select, .t-farm textarea, .t-farm input[type=datetime-local] {
   background: #fff8e0; color: #4a2c12; border: 3px solid #8a4b1c;
   font-family: "Chalkboard SE", "Marker Felt", "Courier New", monospace; font-weight: bold;
 }
@@ -132,6 +133,7 @@ body.t-farm {
 
 <div class="topbar">
   <button class="secondary themebtn" id="themeBtn" onclick="toggleTheme()">Theme</button>
+  <button class="secondary themebtn" id="connBtn" onclick="toggleConn()">&#9881;</button>
   <h1 id="title">Time Tracker</h1>
   <div class="sub" id="subtitle"></div>
 </div>
@@ -147,6 +149,10 @@ body.t-farm {
 </div>
 
 <div class="card hidden" id="endCard">
+  <label>Start (edit if needed)</label>
+  <input type="datetime-local" id="startField">
+  <label>End (edit if needed)</label>
+  <input type="datetime-local" id="endField">
   <label>What did you work on?</label>
   <textarea id="description" rows="3"></textarea>
   <button onclick="saveEntry()">Save entry</button>
@@ -168,7 +174,7 @@ body.t-farm {
   </table>
 </div>
 
-<div class="card">
+<div class="card hidden" id="connCard">
   <h2 id="connTitle">Connection</h2>
   <div class="status" id="flowStatus"></div>
   <label>Power Automate flow URL (kept on this iPad only)</label>
@@ -286,7 +292,8 @@ function getFlowUrl() {
 
 function flowReady() {
   if (!getFlowUrl()) {
-    setMsg('Enter your flow URL in the Connection box at the bottom first.');
+    showConn();
+    setMsg('Enter your flow URL in the Connection box first.');
     return false;
   }
   return true;
@@ -307,6 +314,7 @@ function saveFlowUrl() {
   }
   box.value = '';
   refreshFlowStatus();
+  hideConn();
   setMsg('Flow URL saved on this iPad.');
 }
 
@@ -316,6 +324,24 @@ function clearFlowUrl() {
   } catch (e) {}
   refreshFlowStatus();
   setMsg('Flow URL removed from this iPad.');
+}
+
+function showConn() {
+  document.getElementById('connCard').className = 'card';
+}
+
+function hideConn() {
+  document.getElementById('connCard').className = 'card hidden';
+  document.getElementById('flowView').value = '';
+  document.getElementById('flowView').className = 'hidden';
+}
+
+function toggleConn() {
+  if (document.getElementById('connCard').className === 'card') {
+    hideConn();
+  } else {
+    showConn();
+  }
 }
 
 function toggleFlowView() {
@@ -359,7 +385,14 @@ function loadProjects() {
   setMsg('Loading projects...');
   request('POST', getFlowUrl(), { action: 'projects' }, function (err, text) {
     if (err) {
-      setMsg('Could not load projects (' + err + '). Check the hotspot.');
+      if (err === 'no connection') {
+        setMsg('Could not reach the flow (no connection). Check the hotspot.');
+      } else if (err === 'HTTP 401' || err === 'HTTP 403') {
+        showConn();
+        setMsg('The flow refused the request (' + err + '). The saved flow URL is probably wrong or incomplete. Use Show saved URL to check it.');
+      } else {
+        setMsg('The flow replied with an error (' + err + ').');
+      }
       return;
     }
     try {
@@ -405,9 +438,45 @@ function startTimer() {
   }
 }
 
+var startInitial = '';
+var endInitial = '';
+var endMoment = null;
+
+function pad2(n) {
+  return n < 10 ? '0' + n : '' + n;
+}
+
+// Date -> "YYYY-MM-DDTHH:MM" in the iPad's local time (what the picker uses)
+function toLocalInput(d) {
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+    'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+
+// "YYYY-MM-DDTHH:MM" -> Date (parsed by hand because old Safari is unreliable)
+function parseLocalInput(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(s || '');
+  if (!m) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+}
+
 function showEnd() {
+  var running = load(KEY_RUNNING, null);
+  if (!running) {
+    setMsg('Nothing is running.');
+    return;
+  }
+  var card = document.getElementById('endCard');
+  if (card.className === 'card') {
+    document.getElementById('description').focus();
+    return;
+  }
+  endMoment = new Date();
+  startInitial = toLocalInput(new Date(running.start));
+  endInitial = toLocalInput(endMoment);
+  document.getElementById('startField').value = startInitial;
+  document.getElementById('endField').value = endInitial;
   document.getElementById('description').value = '';
-  document.getElementById('endCard').className = 'card';
+  card.className = 'card';
   document.getElementById('description').focus();
 }
 
@@ -426,8 +495,31 @@ function saveEntry() {
     setMsg('Add a short description first.');
     return;
   }
-  var endDate = new Date();
+  // Use the exact times unless the person changed the fields
   var startDate = new Date(running.start);
+  var endDate = endMoment || new Date();
+  var sVal = document.getElementById('startField').value;
+  var eVal = document.getElementById('endField').value;
+  if (sVal !== startInitial) {
+    var ps = parseLocalInput(sVal);
+    if (!ps) {
+      setMsg('Start time is not valid. Use the format 2026-11-27T09:30.');
+      return;
+    }
+    startDate = ps;
+  }
+  if (eVal !== endInitial) {
+    var pe = parseLocalInput(eVal);
+    if (!pe) {
+      setMsg('End time is not valid. Use the format 2026-11-27T09:30.');
+      return;
+    }
+    endDate = pe;
+  }
+  if (endDate <= startDate) {
+    setMsg('The end time must be after the start time.');
+    return;
+  }
   var rawHours = (endDate - startDate) / 3600000;
   var hours = Math.max(ROUND_TO_HOURS, Math.round(rawHours / ROUND_TO_HOURS) * ROUND_TO_HOURS);
 
@@ -436,7 +528,7 @@ function saveEntry() {
     id: Date.now() + '-' + Math.floor(Math.random() * 100000),
     project: running.project,
     projectId: running.projectId,
-    start: running.start,
+    start: startDate.toISOString(),
     end: endDate.toISOString(),
     hours: hours,
     description: desc,
@@ -492,7 +584,11 @@ function syncEntries() {
   setMsg('Sending ' + unsent.length + ' entries...');
   request('POST', getFlowUrl(), { action: 'entries', entries: unsent }, function (err) {
     if (err) {
-      setMsg('Sync failed (' + err + '). Entries are kept on this iPad, so try again later.');
+      if (err === 'HTTP 401' || err === 'HTTP 403') {
+        setMsg('Sync failed (' + err + '). The saved flow URL is probably wrong or incomplete. Entries are kept on this iPad.');
+      } else {
+        setMsg('Sync failed (' + err + '). Entries are kept on this iPad, so try again later.');
+      }
       return;
     }
     var sentIds = {};
@@ -535,6 +631,7 @@ function toggleCsv() {
 // ---- Start up ----
 applyTheme();
 refreshFlowStatus();
+if (!getFlowUrl()) showConn();
 renderProjects();
 refreshTimerUI();
 renderEntries();
